@@ -24,12 +24,27 @@
   height: 50px;
   width: 100px;
   background-color: green;
+  position: absolute;
+}
+
+.button-component-sidebar {
+  height: 50px;
+  width: 100px;
+  background-color: green;
   position: relative;
 }
+
+.label-component-sidebar {
+  height: 50px;
+  width: 100px;
+  background-color: pink;
+  position: relative;
+}
+
 
 .label-component {
   height: 50px;
   width: 100px;
   background-color: pink;
-  position: relative;
+  position: absolute;
 }

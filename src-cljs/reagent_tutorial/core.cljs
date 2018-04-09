@@ -14,6 +14,9 @@
     [{:id "b1" :caption "Button 1"}
      {:id "b2" :caption "Button 2"}]}))
 
+(defn get-next-component-id [component-type]
+  (inc (count (filter #( = (:type %) component-type)))))
+
 (defn update-components! [f & args]
   (do
     (.log js/console (str args))
@@ -21,8 +24,10 @@
 
 (defn add-component! [c x y]
   (case c
-    "Button" (update-components! conj {:id "b3" :caption "Button 3" :x x :y y})
-    "Label" (update-components! conj {:id "l3" :caption "Label 3" :x x :y y})))
+    "Button" (update-components! conj {:id
+                                       (str "Button " (get-next-component-id "button")) :caption "Button 3" :x x :y y})
+    "Label" (update-components! conj {:id "l3" :caption "Label 3" :x x :y y})
+    ""))
 
 (defn remove-component! [c]
   (update-components! (fn [cs]
@@ -46,13 +51,14 @@
 (defn main-component []
   [:div {:class "main-component"}
    [:div {:class "component-sidebar"}
-    [:div {:class "button-component" :on-click #(do
+    [:div {:class "button-component-sidebar" :on-click #(do
                                                   (.log js/console "Selected button")
                                                   (reset! selected-component "Button"))}]
-    [:div {:class "label-component"}]]
-   [:div {:class "editor-canvas" :on-click #(do
+    [:div {:class "label-component-sidebar"}]]
+   [:div {:id "editor-canvas" :on-click #(do
                                             (.log js/console  (str "Created " @selected-component (.-clientX %) (.-clientY %)))
-                                            (add-component! @selected-component (.-clientX %) (.-clientY %) ))}
+                                            (add-component! @selected-component (.-clientX %) (.-clientY %))
+                                            (reset! selected-component ""))}
     (for [c (:components @app-state)]
       [component c])
     ]])
