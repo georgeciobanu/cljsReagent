@@ -58,7 +58,7 @@
                            (reset! start-move {:x (- (.-clientX %) (:x c)) :y (- (.-clientY %) (:y c))})
                            (.log js/console (:x @start-move)))
          :on-mouse-move #( if (seq @start-move)
-                           (update-component! (:id c) {:x (.-clientX %) :y (.-clientY %)}))
+                           (update-component! (:id c) {:x (- (.-clientX %) (:x @start-move)) :y (- (.-clientY %) (:y @start-move))}))
          :on-mouse-up #(reset! start-move {})}
    [:span (:caption c)]])
 
