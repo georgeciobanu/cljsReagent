@@ -29,21 +29,37 @@
     "Label" (update-components! conj {:id "l3" :caption "Label 3" :x x :y y})
     ""))
 
-(defn remove-component! [c]
+;; TODO fix it so it works
+(defn remove-component! [cid]
   (update-components! (fn [cs]
-                      (remove #(= % c) cs))
-                    c))
+                      (remove #(= (:id %) cid) cs))
+                    cid))
 
 (defn get-component-by-id [id]
-  (get-in @app-state [:components id]))
+  (first (filter #(= id (:id %)) (:components @app-state))))
+
+
+(defn update-helper [c cid new-key-vals]
+  (if (= cid (:id c))
+      (merge c new-key-vals)
+      c))
 
 (defn update-component! [cid new-key-vals]
   (update-components! (fn [cs]
-                          (update-in cs [cid] merge new-key-vals))))
+                          (map #(update-helper % cid new-key-vals) cs))))
+
+
+(def start-move (atom {}))
 
 ;; UI components
 (defn component [c]
-  [:div {:class "button-component" :style {:top (:y c) :left (:x c)}}
+  [:div {:class "button-component" :style {:top (:y c) :left (:x c)}
+         :on-mouse-down #(do
+                           (reset! start-move {:x (- (.-clientX %) (:x c)) :y (- (.-clientY %) (:y c))})
+                           (.log js/console (:x @start-move)))
+         :on-mouse-move #( if (seq @start-move)
+                           (update-component! (:id c) {:x (.-clientX %) :y (.-clientY %)}))
+         :on-mouse-up #(reset! start-move {})}
    [:span (:caption c)]])
 
 
