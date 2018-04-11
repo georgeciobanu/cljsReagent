@@ -11,11 +11,11 @@
 (def app-state
   (r/atom
    {:components
-    [{:id "b1" :caption "Button 1"}
-     {:id "b2" :caption "Button 2"}]}))
+    [{:id "b1" :caption "Button 1" :type "button" :x 180 :y 50}
+     {:id "b2" :caption "Button 2" :type "button" :x 20 :y 50}]}))
 
 (defn get-next-component-id [component-type]
-  (inc (count (filter #( = (:type %) component-type)))))
+  (inc (count (filter #( = (:type %) component-type) (@app-state :components)))))
 
 (defn update-components! [f & args]
   (do
@@ -24,12 +24,14 @@
 
 (defn add-component! [c x y]
   (case c
-    "Button" (update-components! conj {:id
-                                       (str "Button " (get-next-component-id "button")) :caption "Button 3" :x x :y y})
+    "Button" (update-components! conj {:id (str "Button " (get-next-component-id "button"))
+                                       :caption (str "Button " (get-next-component-id "button"))
+                                       :x x
+                                       :y y
+                                       :type "button"})
     "Label" (update-components! conj {:id "l3" :caption "Label 3" :x x :y y})
     ""))
 
-;; TODO fix it so it works
 (defn remove-component! [cid]
   (update-components! (fn [cs]
                       (remove #(= (:id %) cid) cs))
@@ -49,18 +51,23 @@
                           (map #(update-helper % cid new-key-vals) cs))))
 
 
-(def start-move (atom {}))
 
 ;; UI components
 (defn component [c]
-  [:div {:class "button-component" :style {:top (:y c) :left (:x c)}
-         :on-mouse-down #(do
-                           (reset! start-move {:x (- (.-clientX %) (:x c)) :y (- (.-clientY %) (:y c))})
-                           (.log js/console (:x @start-move)))
+  (let [start-move (atom {})]
+    (fn [c]
+      [:div {:class "button-component" :style {:top (:y c) :left (:x c)}
+              :on-mouse-down #(do
+                                (reset! start-move {:x (- (.-clientX %) (:x c))
+                                                    :y (- (.-clientY %) (:y c))})
+                                (.log js/console (:x @start-move)))
          :on-mouse-move #( if (seq @start-move)
-                           (update-component! (:id c) {:x (- (.-clientX %) (:x @start-move)) :y (- (.-clientY %) (:y @start-move))}))
-         :on-mouse-up #(reset! start-move {})}
-   [:span (:caption c)]])
+                           (update-component! (:id c)
+                                              {:x (- (.-clientX %) (:x @start-move))
+                                               :y (- (.-clientY %) (:y @start-move))}))
+         :on-mouse-up #(reset! start-move {})
+         :on-mouse-out #(reset! start-move {})}
+   [:span (:caption c)]])))
 
 
 
