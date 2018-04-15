@@ -21,10 +21,16 @@
 }
 
 .button-component {
-  height: 50px;
-  width: 100px;
   background-color: green;
   position: absolute;
+}
+
+.resize-handler {
+  border: 2px solid black;
+  position: absolute;
+  height: 2px;
+  width: 2px;
+
 }
 
 .button-component-sidebar {
