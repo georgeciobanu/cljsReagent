@@ -68,13 +68,12 @@
           @app-state)))
 
 (defn get-components-in-rect [x1 y1 x2 y2]
-  "returns components within rectangle"
   (filter #(and
-             (and (=> (:x %) x1)
-                  (=> (:y %) y1))
+             (and (>= (:x %) x1)
+                  (>= (:y %) y1))
              (and (<= (+ (:x %) (:width %)) x2)
                   (<= (+ (:y %) (:height %)) y2)))
-          @app-state))
+          (:components @app-state)))
 
 (def selection-div-size (r/atom {}))
 
@@ -185,7 +184,10 @@
                                                                                      (:y @start-move)
                                                                                      (.-clientX %)
                                                                                      (.-clientY %)))
-                                    (.log js/console (str "Start: " @start-move " size" @selection-div-size))))
+                                    (.log js/console (str "Start: " @start-move " end " (.-clientX %) " " (.-clientY %)))
+                                    (.log js/console (str "comps: " (get-components-in-rect (:x @start-move) (:y @start-move) (.-clientX %) (.-clientY %))))
+;;                                     (.log js/console (str @app-state))
+                                                ))
           :on-mouse-up #(do
                           (reset! start-move {})
                           (reset! selection-div-size {}))}
