@@ -33,6 +33,11 @@
 
 }
 
+.selection-rect {
+  border: 2px solid green;
+  position: absolute;
+}
+
 .button-component-sidebar {
   height: 50px;
   width: 100px;

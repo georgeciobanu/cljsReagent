@@ -56,7 +56,29 @@
   (update-components! (fn [cs]
                           (map #(update-helper % cid new-key-vals) cs))))
 
+(defn get-component-under-cursor [evt]
+  "returns the topmost component under cursor"
+  (let [curX (.-clientX evt)
+        curY (.-clientY evt)]
+    (some #(and
+              (and (>= curX (:x %))
+                   (>= curY (:y %)))
+              (and (<= curX (+ (:x %) (:width %)))
+                   (<= curY (+ (:y %) (:height %)))))
+          @app-state)))
 
+(defn get-components-in-rect [x1 y1 x2 y2]
+  "returns components within rectangle"
+  (filter #(and
+             (and (=> (:x %) x1)
+                  (=> (:y %) y1))
+             (and (<= (+ (:x %) (:width %)) x2)
+                  (<= (+ (:y %) (:height %)) y2)))
+          @app-state))
+
+(def selection-div-size (r/atom {}))
+
+(def sel-canvas-comp (r/atom {}))
 
 ;; UI components
 
@@ -90,33 +112,42 @@
          :style {:top (- (:height c) 3)
                  :left (/ (:width c) 2)}}])
 
+(def start-move (atom {}))
 
+(defn save-cursor-pos [evt]
+  (reset! start-move {:x (.-clientX evt)
+                      :y (.-clientY evt)}))
 
 (defn component [c]
-  (let [start-move (atom {})]
-    (fn [c]
       [:div {:class "button-component" :style {:top (:y c)
                                                :left (:x c)
                                                :width (str (:width c) "px")
                                                :height (str (:height c) "px")
                                                }
-              :on-mouse-down #(do
-                                (reset! start-move {:x (- (.-clientX %) (:x c))
-                                                    :y (- (.-clientY %) (:y c))})
-                                (.log js/console (:x @start-move)))
-         :on-mouse-move #( if (seq @start-move)
-                           (update-component! (:id c)
-                                              {:x (- (.-clientX %) (:x @start-move))
-                                               :y (- (.-clientY %) (:y @start-move))}))
-         :on-mouse-up #(reset! start-move {})
-         :on-mouse-out #(reset! start-move {})}
+;;               :on-mouse-down #(do
+;;                                 (save-cursor-pos %)
+;;                                 (.log js/console (:x @start-move)))
+;;          :on-mouse-move #( if (seq @start-move)
+;;                            (update-component! (:id c)
+;;                                               {:x (- (.-clientX %) (:x @start-move))
+;;                                                :y (- (.-clientY %) (:y @start-move))}))
+;;          :on-mouse-up #(reset! start-move {})
+;;          :on-mouse-out #(reset! start-move {})
+             }
        [resize-handler-mid-left c]
        [resize-handler-mid-top c]
        [resize-handler-mid-right c]
        [resize-handler-mid-bottom c]
        ;[:span (:caption c)]
-       ])))
+       ])
 
+(defn selection-rect []
+  [:div {:style {:top (:y @start-move)
+               :left (:x @start-move)
+               :width (:width @selection-div-size)
+               :height (:height @selection-div-size)
+               :hidden (empty? @selection-div-size)}
+   :class "selection-rect"}])
 
 
 (defn main-component []
@@ -129,14 +160,37 @@
                                                   (.log js/console "Selected label")
                                                   (reset! sel-palette-comp "label"))}]]
    [:div {:id "editor-canvas"
-          :on-mouse-down #(cond ;if the user selected a component from the comp palette, place it on the canvas
-                                (seq @sel-palette-comp) (do
-                                                            (.log js/console  (str "Created " @sel-palette-comp (.-clientX %) (.-clientY %)))
-                                                            (add-component! @sel-palette-comp (.-clientX %) (.-clientY %))
-                                                            (reset! sel-palette-comp ""))
-                                ;if there are selected component(s) on the canvas, move it/them
-                                 (seq @selected-component) (do
-                                                             (.log js/console ()}
+          :on-mouse-down #(cond ;; if the user selected a component from the comp palette, place it on the canvas
+                            (seq @sel-palette-comp) (do
+                                                      (.log js/console  (str "Created " @sel-palette-comp (.-clientX %) (.-clientY %)))
+                                                      (add-component! @sel-palette-comp (.-clientX %) (.-clientY %))
+                                                      (reset! sel-palette-comp ""))
+                            ;; if cursor over empty area, deselect everything
+
+                            ;; if nothing is selected or there are selected component(s) on the canvas,
+                            ;; save the cursor position for moving components or drawing a selection rectangle
+                            :else (do
+                                    (save-cursor-pos %)))
+          :on-mouse-move #(cond ;; if components are selected, move them
+                            (seq @sel-canvas-comp) (do
+                                                     (map fn [c] (update-component! (:id c)
+                                                                                    {:x (- (.-clientX %) (:x @start-move))
+                                                                                     :y (- (.-clientY %) (:y @start-move))}
+                                                          @sel-canvas-comp)))
+                            ;; otherwise draw a selection rectangle
+                            (seq @start-move) (do
+                                    (reset! selection-div-size {:width (- (.-clientX %) (:x @start-move))
+                                                                :height (- (.-clientY %) (:y @start-move))})
+                                    (reset! @sel-canvas-comp (get-components-in-rect (:x @start-move)
+                                                                                     (:y @start-move)
+                                                                                     (.-clientX %)
+                                                                                     (.-clientY %)))
+                                    (.log js/console (str "Start: " @start-move " size" @selection-div-size))))
+          :on-mouse-up #(do
+                          (reset! start-move {})
+                          (reset! selection-div-size {}))}
+    [selection-rect]
+
     (for [c (:components @app-state)]
       [component c])
     ]])
