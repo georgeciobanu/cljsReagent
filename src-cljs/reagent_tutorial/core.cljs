@@ -6,7 +6,6 @@
 
 (def sel-palette-comp (atom ""))
 
-(def selecting (atom false))
 
 ;; The "database" of your client side UI.
 (def app-state
@@ -69,19 +68,31 @@
           (:components @app-state)))))
 
 (defn get-components-in-rect [x1 y1 x2 y2]
-  (map (fn [c] ({:id (:id c) :x-offset 0 :y-offset 0}))
-       (filter #(and
-             (and (>= (:x %) x1)
-                  (>= (:y %) y1))
-             (and (<= (+ (:x %) (:width %)) x2)
-                  (<= (+ (:y %) (:height %)) y2)))
-          (:components @app-state)))
+ (filter #(and
+       (and (>= (:x %) x1)
+            (>= (:y %) y1))
+       (and (<= (+ (:x %) (:width %)) x2)
+            (<= (+ (:y %) (:height %)) y2)))
+    (:components @app-state)))
 
 (def selection-div-size (r/atom {}))
 
-(def sel-canvas-comp (r/atom []))
+(def selected-components (r/atom []))
 
 (def current-operation (r/atom ""))
+
+(defn get-selected-comp-offsets [evt]
+  (map (fn spaceMonkey [c] (identity {:id (:id c)
+                :x-offset (- (.-clientX evt) (:x c))
+                :y-offset (- (.-clientY evt) (:y c))}))
+       @selected-components))
+
+(defn deselect-all-components []
+  (doseq [c (:components @app-state)]
+    (update-component! (:id c) {:selected false}))
+  (reset! selected-components []))
+
+(def comp-offsets (r/atom []))
 
 ;; UI components
 
@@ -115,9 +126,16 @@
          :style {:top (- (:height c) 3)
                  :left (/ (:width c) 2)}}])
 
+(defn resize-handlers [c]
+ [resize-handler-mid-left c]
+ [resize-handler-mid-top c]
+ [resize-handler-mid-right c]
+ [resize-handler-mid-bottom c])
+
+
 (def start-move (atom {}))
 
-(defn save-cursor-offset [evt]
+(defn save-cursor-pos [evt]
   (reset! start-move {:x (.-clientX evt)
                       :y (.-clientY evt)}))
 
@@ -126,21 +144,9 @@
                                                :left (:x c)
                                                :width (str (:width c) "px")
                                                :height (str (:height c) "px")
-                                               }
-;;               :on-mouse-down #(do
-;;                                 (save-cursor-offset %)
-;;                                 (.log js/console (:x @start-move)))
-;;          :on-mouse-move #( if (seq @start-move)
-;;                            (update-component! (:id c)
-;;                                               {:x (- (.-clientX %) (:x @start-move))
-;;                                                :y (- (.-clientY %) (:y @start-move))}))
-;;          :on-mouse-up #(reset! start-move {})
-;;          :on-mouse-out #(reset! start-move {})
-             }
-       [resize-handler-mid-left c]
-       [resize-handler-mid-top c]
-       [resize-handler-mid-right c]
-       [resize-handler-mid-bottom c]
+                                               }}
+       (if (:selected c)
+         [resize-handlers c])
        ;[:span (:caption c)]
        ])
 
@@ -157,75 +163,74 @@
   [:div {:class "main-component"}
    [:div {:class "component-sidebar"}
     [:div {:class "button-component-sidebar" :on-click #(do
+                                                  (reset! current-operation "insert")
                                                   (.log js/console "Selected button")
                                                   (reset! sel-palette-comp "button"))}]
     [:div {:class "label-component-sidebar"  :on-click #(do
+                                                  (reset! current-operation "insert")
                                                   (.log js/console "Selected label")
                                                   (reset! sel-palette-comp "label"))}]]
    [:div {:id "editor-canvas"
           :on-mouse-down #(let [comp-under-cursor (get-component-under-cursor %)]
                             (cond
                               ;; user selected a component to insert
-                              (= current-operation "insert") (do
+                              (= @current-operation "insert") (do
                                                                (.log js/console  (str "Created " @sel-palette-comp (.-clientX %) (.-clientY %)))
                                                                (add-component! @sel-palette-comp (.-clientX %) (.-clientY %))
                                                                (reset! sel-palette-comp "")
-                                                               (reset! current-operation ""))
+                                                               (reset! current-operation "")
+                                                               (deselect-all-components))
                               ;; user clicked on empty area
                               (empty? comp-under-cursor) (do
+                                                           (.log js/console "nothing under cursor")
                                                            (save-cursor-pos %)
                                                            (reset! current-operation "select")
-                                                           (reset! sel-canvas-comp [])
-                                                           (doseq [c @sel-canvas-comp]
-                                                             (update-component! c {:selected false})))
+                                                           (deselect-all-components))
                               ;; user clicked on a component
-                              (seq comp-under-cursor) (do
-                                                        ;; save all selected components' offset to cursor
-                                                        (
+                              (seq comp-under-cursor) (do ;; save the current cursor and each component's offset to it
+                                                        (reset! current-operation "move")
+                                                        ;; set operation to move
+                                                        ;; if the component is not selected,
+                                                        ;; deselect all and select the one under cursor
+                                                        (if (not (:selected comp-under-cursor))
+                                                          (do
+                                                            (deselect-all-components)
+                                                            (reset! selected-components [comp-under-cursor])
+                                                            (update-component! (:id comp-under-cursor) {:selected true})))
+                                                        (.log js/console (str "Selected comps b4 move " @selected-components))
+                                                        (reset! comp-offsets (get-selected-comp-offsets %))
+                                                        (.log js/console (str "saved offsets " @comp-offsets))
+                                                        (save-cursor-pos %))))
 
-                              (do ;; otherwise save the current cursor and each component's offset to it
-                                (save-
-
-                            ;; otherwise save the offset (cursor, selected components)
-                            ;; for moving components or drawing a selection rectangle
-                            :else (do
-                                    (save-cursor-offset %)
-                                    (.log js/console (str "Comp under cursor: " (get-component-under-cursor %)))
-                                    (if (empty? (get-component-under-cursor %))
-                                      ;; we are selecting
-                                      (do
-                                        (reset! sel-canvas-comp [])
-                                        (reset! selecting true)
-                                        (.log js/console (str "Selecting: " @selecting)))
-                                      ;; otherwise we are moving component(s)
-                                      (do
-                                        (reset! selecting false)
-                                        (reset! sel-canvas-comp [(get-component-under-cursor %)])))))
-
-          :on-mouse-move #(cond ;; if components are selected and not selecting, move them
-                            (and (seq @sel-canvas-comp) (not @selecting)) (do
-                                                                            (.log js/console (str "Starting to move " @sel-canvas-comp))
-                                                     (doseq [c @sel-canvas-comp] (update-component! (:id c)
-                                                                                    {:x (- (.-clientX %) (:x @start-move))
-                                                                                     :y (- (.-clientY %) (:y @start-move))})))
-                            ;; otherwise we are selecting so draw a selection rectangle
-                            (seq @start-move) (do
+          :on-mouse-move #(case @current-operation
+                            "move" (do
+                                       ;;(.log js/console (str "Starting to move " @selected-components))
+                                       (.log js/console (str "offsets: " @comp-offsets))
+                                       (doseq [c @comp-offsets]
+                                         (update-component! (:id c)
+                                                            {:x (- (.-clientX %) (:x-offset c))
+                                                             :y (- (.-clientY %) (:y-offset c))})))
+                            "select" (do
                                     (reset! selection-div-size {:width (- (.-clientX %) (:x @start-move))
                                                                 :height (- (.-clientY %) (:y @start-move))})
-                                    (reset! sel-canvas-comp [(get-components-in-rect (:x @start-move)
+                                    (reset! selected-components (get-components-in-rect (:x @start-move)
                                                                                      (:y @start-move)
                                                                                      (.-clientX %)
-                                                                                     (.-clientY %))]))
+                                                                                     (.-clientY %)))
                                     ;; set the selected flag on components
-                                    (map (fn [c] (update-component! (:id c) {:selected (contains? @sel-canvas-comp c)} @app-state)))
-                                    (.log js/console (str "Start: " @start-move " end " (.-clientX %) " " (.-clientY %)))
-                                    (.log js/console (str "comps: " @sel-canvas-comp))
+                                    (doseq [c @selected-components]
+                                      (update-component! (:id c) {:selected true}))
+                                    (.log js/console (str "Start: " @start-move
+                                                          " end " (.-clientX %) " " (.-clientY %)))
+                                    (.log js/console (str "Selected : " @selected-components)))
+                            ;; NOP but looks like the case needs this
+                            "" )
                                     ;; (.log js/console (str @app-state))
-                                                ))
+
           :on-mouse-up #(do
                           (reset! start-move {})
                           (reset! selection-div-size {})
-                          (reset! selecting false))}
+                          (reset! current-operation ""))}
     [selection-rect]
 
     (for [c (:components @app-state)]
