@@ -127,10 +127,11 @@
                  :left (/ (:width c) 2)}}])
 
 (defn resize-handlers [c]
- [resize-handler-mid-left c]
- [resize-handler-mid-top c]
- [resize-handler-mid-right c]
- [resize-handler-mid-bottom c])
+  [:div
+   [resize-handler-mid-left c]
+   [resize-handler-mid-top c]
+   [resize-handler-mid-right c]
+   [resize-handler-mid-bottom c]])
 
 
 (def start-move (atom {}))
@@ -146,7 +147,7 @@
                                                :height (str (:height c) "px")
                                                }}
        (if (:selected c)
-         [resize-handlers c])
+          [resize-handlers c])
        ;[:span (:caption c)]
        ])
 
@@ -164,10 +165,12 @@
    [:div {:class "component-sidebar"}
     [:div {:class "button-component-sidebar" :on-click #(do
                                                   (reset! current-operation "insert")
+                                                  (deselect-all-components)
                                                   (.log js/console "Selected button")
                                                   (reset! sel-palette-comp "button"))}]
     [:div {:class "label-component-sidebar"  :on-click #(do
                                                   (reset! current-operation "insert")
+                                                  (deselect-all-components)
                                                   (.log js/console "Selected label")
                                                   (reset! sel-palette-comp "label"))}]]
    [:div {:id "editor-canvas"
