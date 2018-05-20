@@ -56,8 +56,6 @@
   (update-components! (fn [cs]
                           (map #(update-helper % cid new-key-vals) cs))))
 
-;; TODO: resize operation
-;; TODO: hide selection rectangle when not selecting
 
 (defn get-component-under-cursor [evt]
   "returns the topmost component under cursor"
@@ -84,10 +82,13 @@
 
 (def current-operation (r/atom ""))
 
-(defn get-selected-comp-offsets [evt]
-  (map (fn spaceMonkey [c] (identity {:id (:id c)
-                :x-offset (- (.-clientX evt) (:x c))
-                :y-offset (- (.-clientY evt) (:y c))}))
+(defn get-selected-comp-offset-and-initial [evt]
+  (map (fn spaceMonkey [c] (identity {
+                                       :id (:id c)
+                                       :x-offset (- (.-clientX evt) (:x c))
+                                       :y-offset (- (.-clientY evt) (:y c))
+                                       :x-initial (.-clientX evt)
+                                       :y-initial (.-clientY evt)}))
        @selected-components))
 
 (defn deselect-all-components []
@@ -112,11 +113,14 @@
              :style {:top (/ (:height c) 2)
                      :left (- (:width c) 3)
                      :cursor "ew-resize"}
-             :on-mouse-down #(reset! start-resize {:x (.-clientX %)})
+             :on-mouse-down #(do
+                               (reset! current-operation "resize")
+                               (.log js/console "RESIZE ENABLED")
+                               (.stopPropagation %))
              :on-mouse-move #(if (seq @start-resize)
                                (update-component! (:id c)
                                                   {:width (+ (:width c) (- (.-clientX %) (:x @start-resize)))}))
-             :on-mouse-up #(reset! start-resize {})
+             :on-mouse-up #(reset! current-operation "")
                                                    }])))
 
 (defn resize-handler-mid-top [c]
@@ -203,8 +207,8 @@
                                                             (deselect-all-components)
                                                             (reset! selected-components [comp-under-cursor])
                                                             (update-component! (:id comp-under-cursor) {:selected true})))
-                                                        (.log js/console (str "Selected comps b4 move " @selected-components))
-                                                        (reset! comp-offsets (get-selected-comp-offsets %))
+                                                        (.log js/console (str "Selected comps: " @selected-components))
+                                                        (reset! comp-offsets (get-selected-comp-offset-and-initial %))
                                                         (.log js/console (str "saved offsets " @comp-offsets))
                                                         (save-cursor-pos %))))
 
@@ -229,6 +233,12 @@
                                     (.log js/console (str "Start: " @start-move
                                                           " end " (.-clientX %) " " (.-clientY %)))
                                     (.log js/console (str "Selected : " @selected-components)))
+                            "resize" (do
+                                       (.log js/console "RESIZING")
+                                       (doseq [c @comp-offsets]
+                                         (update-component! (:id c)
+                                                            {:width (+ (:width (first @selected-components)) (- (.-clientX %) (:x-initial c)))
+                                                             :height (+ (:height (first @selected-components)) (- (.-clientY %) (:y-initial c)))})))
                             ;; NOP but looks like the case needs this
                             "" )
                                     ;; (.log js/console (str @app-state))
