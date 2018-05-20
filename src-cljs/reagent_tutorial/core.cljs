@@ -56,6 +56,9 @@
   (update-components! (fn [cs]
                           (map #(update-helper % cid new-key-vals) cs))))
 
+;; TODO: resize operation
+;; TODO: hide selection rectangle when not selecting
+
 (defn get-component-under-cursor [evt]
   "returns the topmost component under cursor"
   (let [curX (.-clientX evt)
