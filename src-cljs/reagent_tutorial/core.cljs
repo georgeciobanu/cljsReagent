@@ -35,6 +35,8 @@
                                       :caption (str "Label " (get-next-component-id "label"))
                                       :x x
                                       :y y
+                                      :width 100
+                                      :height 50
                                       :type "label"})
     ""))
 
@@ -147,7 +149,7 @@
   (reset! start-move {:x (.-clientX evt)
                       :y (.-clientY evt)}))
 
-(defn component [c]
+(defn button [c]
       [:div {:class "button-component" :style {:top (:y c)
                                                :left (:x c)
                                                :width (str (:width c) "px")
@@ -155,8 +157,20 @@
                                                }}
        (if (:selected c)
           [resize-handlers c])
-       ;[:span (:caption c)]
+       [:span (:caption c)]
        ])
+
+(defn label [c]
+      [:div {:class "label-component" :style {:top (:y c)
+                                               :left (:x c)
+                                               :width (str (:width c) "px")
+                                               :height (str (:height c) "px")
+                                               }}
+       (if (:selected c)
+          [resize-handlers c])
+       [:span (:caption c)]
+       ])
+
 
 (defn selection-rect []
   [:div {:style {:top (:y @start-move)
@@ -250,7 +264,9 @@
     [selection-rect]
 
     (for [c (:components @app-state)]
-      [component c])
+      (if (= (:type c) "label")
+        [label c]
+        [button c]))
     ]])
 
 
